@@ -1,0 +1,36 @@
+name: Kurswaechter A 527
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # alle 10 Minuten (GitHub startet oft mit Verspätung)
+  workflow_dispatch:          # erlaubt einen Testlauf per Knopfdruck
+
+permissions:
+  actions: write              # damit sich der Wächter nach der Mail selbst abschalten kann
+  contents: read
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Playwright installieren
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: A 527 pruefen
+        env:
+          CAMPUS_USER: ${{ secrets.CAMPUS_USER }}
+          CAMPUS_PASS: ${{ secrets.CAMPUS_PASS }}
+          MAIL_USER: ${{ secrets.MAIL_USER }}
+          MAIL_PASS: ${{ secrets.MAIL_PASS }}
+        run: python waechter_github.py
+      - name: Waechter abschalten, wenn Mail verschickt
+        if: hashFiles('frei.txt') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable "Kurswaechter A 527" --repo "$GITHUB_REPOSITORY"
